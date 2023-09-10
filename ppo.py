@@ -18,9 +18,9 @@ class PPO(nn.Module):
         super(PPO, self).__init__()
         self.data = []
         
-        self.fc1   = nn.Linear(4,256)
-        self.fc_pi = nn.Linear(256,2)
-        self.fc_v  = nn.Linear(256,1)
+        self.fc1   = nn.Linear(4,256) #fc fully connected 
+        self.fc_pi = nn.Linear(256,2) #pi as for policy? 
+        self.fc_v  = nn.Linear(256,1) #what are  fc_value
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
 
     def pi(self, x, softmax_dim = 0):
@@ -60,7 +60,7 @@ class PPO(nn.Module):
         s, a, r, s_prime, done_mask, prob_a = self.make_batch()
 
         for i in range(K_epoch):
-            td_target = r + gamma * self.v(s_prime) * done_mask
+            td_target = r + gamma * self.v(s_prime) * done_mask # iF done is 0 then td_targrt = r TD  Temporal-Difference
             delta = td_target - self.v(s)
             delta = delta.detach().numpy()
 
@@ -77,7 +77,7 @@ class PPO(nn.Module):
             ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
 
             surr1 = ratio * advantage
-            surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage
+            surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage #clip
             loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach())
 
             self.optimizer.zero_grad()
