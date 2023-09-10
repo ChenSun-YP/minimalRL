@@ -59,29 +59,33 @@ class PPO(nn.Module):
     def train_net(self):
         s, a, r, s_prime, done_mask, prob_a = self.make_batch()
 
-        for i in range(K_epoch):
+        for i in range(K_epoch): #update multile times
             td_target = r + gamma * self.v(s_prime) * done_mask # iF done is 0 then td_targrt = r TD  Temporal-Difference
             delta = td_target - self.v(s)
             delta = delta.detach().numpy()
 
             advantage_lst = []
             advantage = 0.0
-            for delta_t in delta[::-1]:
+            for delta_t in delta[::-1]: #reverse
                 advantage = gamma * lmbda * advantage + delta_t[0]
                 advantage_lst.append([advantage])
             advantage_lst.reverse()
             advantage = torch.tensor(advantage_lst, dtype=torch.float)
 
             pi = self.pi(s, softmax_dim=1)
-            pi_a = pi.gather(1,a)
+            pi_a = pi.gather(1,a) #new prob
             ratio = torch.exp(torch.log(pi_a) - torch.log(prob_a))  # a/b == exp(log(a)-log(b))
 
-            surr1 = ratio * advantage
-            surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage #clip
-            loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach())
+            surr1 = ratio * advantage #full loss
+            surr2 = torch.clamp(ratio, 1-eps_clip, 1+eps_clip) * advantage #clip the policy ratio policyLOSS
+            # Et F.smooth_l1_loss(self.v(s) , td_target.detach())method is used to prevent the 
+            # gradients from being back-propagated through the td_target. This is common in 
+            # reinforcement learning when you have a target that you don't want to update during backpropagation.
+
+            loss = -torch.min(surr1, surr2) + F.smooth_l1_loss(self.v(s) , td_target.detach()) #train value and policy
 
             self.optimizer.zero_grad()
-            loss.mean().backward()
+            loss.mean().backward() #update policy
             self.optimizer.step()
         
 def main():
@@ -95,6 +99,7 @@ def main():
         done = False
         while not done:
             for t in range(T_horizon):
+                print(s,type(s))
                 prob = model.pi(torch.from_numpy(s).float())
                 m = Categorical(prob)
                 a = m.sample().item()
